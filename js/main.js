@@ -23,13 +23,41 @@ class MCEnvironment {
     noise.seed(Math.random()); // initialize the noise seed
     this.chunkSize = 16 // 16 by 16 blocks;
     this.blockSize = 10 // 10 THREE.js units
-    this.heightMultiplier = 20; // increases the 'amplitude' of the noise
-    this.widthMultiplier = 20; // smooths the noise
+    this.heightMultiplier = 100; // increases the 'amplitude' of the noise
+    this.widthMultiplier = 100; // smooths the noise
     this.totalChunkSize = this.chunkSize * this.blockSize;
-    this.renderRange = 1 // render chunks in a radius of 4 chunks
+    this.renderRange = 2 // render chunks in a radius of 1 chunks
+    this.chunkBlocks = this.chunkSize ** 2;
+
+
+    // render settings
+    this.maxFrameRate = 30
+    this.minFrameInterval = 1000 / this.maxFrameRate
+    this.prevFrame = 0;
+
+    // tick settings 
+    this.chunkTickRate = 2 // times per second
+    this.chunkTickInterval = 1000 / this.chunkTickRate
+    this.prevChunkUpdate = 0;
+
+
+    // data storage
+    this.activeChunks = {} // chunk-coords keys
 
     // tell document to start rendinering when it's ready.
     document.addEventListener("DOMContentLoaded", () => this.init() );
+  }
+
+  frameLimiter() {
+    const now = Date.now();
+    // console.log(now);
+    const interval = now - this.prevFrame
+    if (interval >= this.minFrameInterval) {
+      this.prevFrame = now;
+      // console.log('rendering new frame!')
+      this.updateFrame();
+    }
+    requestAnimationFrame(() => this.tick());
   }
 
   createLight(strength, direction) {
@@ -51,7 +79,7 @@ class MCEnvironment {
     document.body.appendChild(this.renderer.domElement);
 
     // generate initial chunks
-    this.renderChunks();
+    this.updateChunks();
 
     // enable camera controls
     this.controls = new THREE.OrbitControls(
@@ -70,62 +98,111 @@ class MCEnvironment {
   normalize(value, normal) {
     return Math.round(value / normal) * normal;
   }
-
-  // get the location of chunks within the draw distance and draw them
-  renderChunks() {
-    // get the centre point to calculate from
-    const centerPoint = this.camera.position // (x, y, z)
-    console.log(centerPoint);
-    const centerX = this.normalize(centerPoint.x, this.totalChunkSize) / this.chunkSize
-    const centerZ = this.normalize(centerPoint.z, this.totalChunkSize) / this.chunkSize;
-
-    // loop from -renderRange to renderRange (eg -4 to 4) for x and z to get chunks
-    for(let x = this.renderRange * -1; x <= this.renderRange; x++) {
-      for (let z = this.renderRange * -1; z <= this.renderRange; z++) {
-        // global coordinates for this chunk
-        const chunkX = centerX + x
-        const chunkZ = centerZ + z
-        
-        // TODO: only create a chunk if it's not already created
-        // render it
-        this.generateChunk(chunkX, chunkZ);
-      }
-    }
-  }
+  
 
   // tick should be run once every frame to update physics, object locations and animations.
   tick() {
     // tick logic, animation etc happens here
+    this.updateChunks();
 
+    // draw new frame and call tick again with frameLimiter
+    this.frameLimiter();
+  }
 
-    // draw new frame and call tick again
-    this.updateFrame();
-    
-    requestAnimationFrame(() => this.tick());
+  removeChunks(visibleChunks) {
+    const now = Date.now();
+    // go throuch each active chunk
+    Object.keys(this.activeChunks).forEach((chunkID) => {
+      // if it's not in the visible chunk, it's out of render range
+      if (visibleChunks[chunkID] === undefined) {
+        // remove the blocks in this chunk
+        this.activeChunks[chunkID].forEach((block) => {
+          this.scene.remove(block)
+        });
+        // remove this key from active chunks
+        delete this.activeChunks[chunkID];
+      }
+    })
+    // console.log('removing old chunks took:', Date.now() - now,'ms')
+  }
+
+  // get the location of chunks within the draw distance and draw them
+  updateChunks() {
+    // limite rate of chunk updates
+    const now = Date.now();
+    const interval = now - this.prevChunkUpdate;
+    if (interval < this.chunkTickInterval) {
+      return
+    }
+
+    this.prevChunkUpdate = now;
+
+    // console.log('updating chunks');
+    // get the centre point to calculate from
+    const centerPoint = this.camera.position // (x, y, z)
+    // console.log(centerPoint);
+    const centerX = this.normalize(centerPoint.x, this.totalChunkSize) / this.totalChunkSize
+    const centerZ = this.normalize(centerPoint.z, this.totalChunkSize) / this.totalChunkSize;
+
+    const visibleChunks = {}; // will store all the chunks visible in this update
+
+    // loop from -renderRange to renderRange (eg -4 to 4) for x and z to get chunks
+    for (let x = this.renderRange * -1; x <= this.renderRange; x++) {
+      for (let z = this.renderRange * -1; z <= this.renderRange; z++) {
+        // global coordinates for this chunk
+        const chunkX = centerX + x
+        const chunkZ = centerZ + z
+        const chunkID = `${chunkX},${chunkZ}`
+
+        visibleChunks[chunkID] = true; //store this chunk id in an object for easy lookup
+
+        // draw chunk only if it's not already active
+        if (this.activeChunks[chunkID] === undefined) {
+          this.generateChunk(chunkX, chunkZ);
+        }
+      }
+    }
+
+    // remove chunks that are no longer visible
+    this.removeChunks(visibleChunks);
+    // console.log('updating chunks took', Date.now() - now, 'ms - center:',centerX,',',centerZ);
+    // console.log('active chunks:', Object.keys(this.activeChunks).length);
   }
 
   // this will generate the surface layer for the chunk
-  generateChunk(x = 0 ,y = 0) {
+  generateChunk(x = 0, z = 0) {
+    const now = Date.now();
     const cx = x * this.chunkSize
-    const cy = y * this.chunkSize;
-    // console.log('origin of chunk:', cx, cy)
+    const cz = z * this.chunkSize;
+
+    // initialise storage for this chunk
+    const chunkID = `${x},${z}`;
+    this.activeChunks[chunkID] = new Array(this.chunkBlocks);
+
+    // console.log('origin of chunk:', cx, cz)
     // loop through the layer of chunk size
+    let index = 0;
     for (let i = 0; i < this.chunkSize; i++) {
       for (let j = 0; j < this.chunkSize; j++) {
         // get noise for this grid square
-        // +x and y to make it relative to this chunk
+        // +x and z to make it relative to this chunk
         const bx = i + cx;
-        const by = j + cy;
+        const bz = j + cz;
         
+        // get the height of the terrain in normalized blocks
+        const heightNoise = noise.simplex2(bx / this.widthMultiplier, bz / this.widthMultiplier)
+        const height = Math.floor(heightNoise * this.heightMultiplier / this.blockSize) * this.blockSize
+        
+        const block = this.generateBlock(bx * this.blockSize, bz * this.blockSize, height)
 
-        const height = Math.floor(noise.simplex2(bx / this.widthMultiplier, by / this.widthMultiplier ) * this.heightMultiplier / this.blockSize) * this.blockSize
-        console.log(height)
-        this.makeCube(bx*this.blockSize, by*this.blockSize, height);
+        // store this blocks reference so we can remove it later
+        this.activeChunks[chunkID][index++] = block;
       }
     }
+    // console.log('generating individual chunk {', chunkID ,'} took:', Date.now() - now, "ms")
   }
 
-  makeCube(x, z, height) {
+  generateBlock(x, z, height) {
     const cubeMaterial = new THREE.MeshLambertMaterial({color: 'green'});
     const cubeGeom = new THREE.BoxGeometry(
       this.blockSize, this.blockSize, this.blockSize
@@ -138,6 +215,7 @@ class MCEnvironment {
     cube.position.set(x, height, z)
 
     this.scene.add(cube);
+    return cube;
   }
 }
 
