@@ -1,7 +1,7 @@
 class MCEnvironment {
   // environment constuctor
   constructor() {
-    // set up baseic THREE.js components
+    // set up basic THREE.js components
     this.renderer = new THREE.WebGLRenderer();
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(
@@ -29,6 +29,26 @@ class MCEnvironment {
     this.renderRange = 2 // render chunks in a radius of 1 chunks
     this.chunkBlocks = this.chunkSize ** 2;
 
+    // THREE.TextureLoader.crossOrigin = "";
+    this.textureLoader = new THREE.TextureLoader();
+    this.textureLoader.setCrossOrigin(null);
+    this.textureLoader.setPath('res/');
+    this.sideTexture = this.textureLoader.load('side.jpeg');
+    this.topTexture = this.textureLoader.load('top.jpeg');
+    this.bottomTexture = this.textureLoader.load('bottom.jpeg');
+    
+    this.cubeMaterial = [
+      new THREE.MeshLambertMaterial({ map: this.sideTexture }),
+      new THREE.MeshLambertMaterial({ map: this.sideTexture }),
+      new THREE.MeshLambertMaterial({ map: this.topTexture }),
+      new THREE.MeshLambertMaterial({ map: this.bottomTexture }),
+      new THREE.MeshLambertMaterial({ map: this.sideTexture }),
+      new THREE.MeshLambertMaterial({ map: this.sideTexture }),
+    ];
+
+    this.cubeGeom = new THREE.BoxGeometry(
+      this.blockSize, this.blockSize, this.blockSize
+    );
 
     // render settings
     this.maxFrameRate = 30
@@ -46,6 +66,16 @@ class MCEnvironment {
 
     // tell document to start rendinering when it's ready.
     document.addEventListener("DOMContentLoaded", () => this.init() );
+  }
+
+  measure(name, fn) {
+    // get args supplied for fn
+    var args = arguments.length === 1 ? [arguments[0]] : Array.apply(null, arguments).slice(2);
+
+    const then = Date.now();
+    const rval = fn.apply(this, args)
+    console.log(name, 'took', Date.now() - then, 'ms');
+    return rval
   }
 
   frameLimiter() {
@@ -203,12 +233,9 @@ class MCEnvironment {
   }
 
   generateBlock(x, z, height) {
-    const cubeMaterial = new THREE.MeshLambertMaterial({color: 'green'});
-    const cubeGeom = new THREE.BoxGeometry(
-      this.blockSize, this.blockSize, this.blockSize
-    );
+    
 
-    const cube = new THREE.Mesh(cubeGeom, cubeMaterial);
+    const cube = new THREE.Mesh(this.cubeGeom, this.cubeMaterial);
     cube.castShadow = true;
     cube.receiveShadow = true;
 
