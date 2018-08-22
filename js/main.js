@@ -51,11 +51,9 @@ class MCEnvironment {
       this.sideMaterial,
     ];
 
-    this.cubeGeom = new THREE.BoxGeometry(
+    this.cubeGeom = new THREE.BoxBufferGeometry(
       this.blockSize, this.blockSize, this.blockSize,
     );
-
-    this.cube = new THREE.Mesh(this.cubeGeom, this.cubeMaterial);
 
     // render settings
     this.maxFrameRate = 30;
@@ -123,7 +121,7 @@ class MCEnvironment {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setClearColor('#70b8dc');
     // this.renderer.shadowMap.enabled = true;
-    this.renderer.setPixelRatio(window.devicePixelRatio || 1);
+    this.renderer.setPixelRatio(1);
     document.body.appendChild(this.renderer.domElement);
     window.addEventListener('resize', this.resize);
 
@@ -261,7 +259,7 @@ class MCEnvironment {
     // const cube = new THREE.Mesh(this.cubeGeom, this.cubeMaterial);
     // cube.castShadow = true;
     // cube.receiveShadow = true;
-    const cube = this.cube.clone();
+    const cube = new THREE.Mesh(this.cubeGeom, this.cubeMaterial);
     cube.position.set(x, height, z);
 
     this.scene.add(cube);
