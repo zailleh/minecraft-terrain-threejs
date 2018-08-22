@@ -12,13 +12,13 @@ class MCEnvironment {
     );
 
     // add some lights to the scene
-    this.scene.add(this.createLight(1,10));
-    this.scene.add(this.createLight(0.5,-10));
+    this.scene.add(this.createLight(1, 10));
+    this.scene.add(this.createLight(0.5, -10));
 
     // x: -59.4890804496197, y: 91.05971534730678, z: -63.95753916107502
     this.camera.position.set(-60, 90, -60);
     // this.camera.lookAt(1000, 1000, 80);
-    
+
     // terrain generation settings
     noise.seed(Math.random()); // initialize the noise seed
     this.chunkSize = 16 // 16 by 16 blocks;
@@ -36,7 +36,7 @@ class MCEnvironment {
     this.sideTexture = this.textureLoader.load('side.jpeg');
     this.topTexture = this.textureLoader.load('top.jpeg');
     this.bottomTexture = this.textureLoader.load('bottom.jpeg');
-    
+
     this.cubeMaterial = [
       new THREE.MeshLambertMaterial({ map: this.sideTexture }),
       new THREE.MeshLambertMaterial({ map: this.sideTexture }),
@@ -65,7 +65,7 @@ class MCEnvironment {
     this.activeChunks = {} // chunk-coords keys
 
     // tell document to start rendinering when it's ready.
-    document.addEventListener("DOMContentLoaded", () => this.init() );
+    document.addEventListener("DOMContentLoaded", () => this.init());
   }
 
   measure(name, fn) {
@@ -96,7 +96,7 @@ class MCEnvironment {
     light.shadow.mapSize.width = 1024;
     light.shadow.mapSize.height = 1024;
 
-    light.position.set(direction,10,direction);
+    light.position.set(direction, 10, direction);
     return light
   }
 
@@ -128,7 +128,7 @@ class MCEnvironment {
   normalize(value, normal) {
     return Math.round(value / normal) * normal;
   }
-  
+
 
   // tick should be run once every frame to update physics, object locations and animations.
   tick() {
@@ -218,11 +218,11 @@ class MCEnvironment {
         // +x and z to make it relative to this chunk
         const bx = i + cx;
         const bz = j + cz;
-        
+
         // get the height of the terrain in normalized blocks
         const heightNoise = noise.simplex2(bx / this.widthMultiplier, bz / this.widthMultiplier)
         const height = Math.floor(heightNoise * this.heightMultiplier / this.blockSize) * this.blockSize
-        
+
         const block = this.generateBlock(bx * this.blockSize, bz * this.blockSize, height)
 
         // store this blocks reference so we can remove it later
@@ -233,7 +233,7 @@ class MCEnvironment {
   }
 
   generateBlock(x, z, height) {
-    
+
 
     const cube = new THREE.Mesh(this.cubeGeom, this.cubeMaterial);
     cube.castShadow = true;
